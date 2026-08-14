@@ -3267,7 +3267,8 @@ const STYLES = `
     linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)),
     radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
   background-size: auto, 16px 16px;
-  color: #DCE7EF; display: flex; flex-direction: column; padding: 20px 14px;
+  color: #DCE7EF; display: flex; flex-direction: column;
+  padding: 20px 14px; padding-top: calc(20px + env(safe-area-inset-top));
   position: sticky; top: 0; height: 100vh;
 }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 22px; border-bottom: 1px solid rgba(255,255,255,0.12); margin-bottom: 14px; }
@@ -3293,6 +3294,7 @@ const STYLES = `
 .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between; padding: 18px 28px;
+  padding-top: calc(18px + env(safe-area-inset-top));
   background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5;
   gap: 12px;
 }
@@ -3475,13 +3477,13 @@ const STYLES = `
 .gantt-bar-label { position: relative; z-index: 1; font-size: 10px; font-weight: 600; color: var(--ink); padding-left: 6px; white-space: nowrap; }
 
 .ai-fab {
-  position: fixed; bottom: 24px; right: 24px; width: 54px; height: 54px; border-radius: 50%;
+  position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 24px; width: 54px; height: 54px; border-radius: 50%;
   background: var(--signal); color: #fff; border: none; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 6px 18px rgba(0,0,0,0.25); cursor: pointer; z-index: 60;
 }
 .ai-fab:hover { filter: brightness(1.08); }
 .ai-panel {
-  position: fixed; bottom: 24px; right: 24px; width: 360px; height: 480px; max-height: 80vh;
+  position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); right: 24px; width: 360px; height: 480px; max-height: 80vh;
   background: var(--surface); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.28);
   display: flex; flex-direction: column; z-index: 60; overflow: hidden; border: 1px solid var(--line);
 }
@@ -3511,7 +3513,7 @@ const STYLES = `
   .menu-btn { display: inline-flex; }
 
   .content { padding: 16px 14px 60px; }
-  .topbar { padding: 12px 14px; }
+  .topbar { padding: 12px 14px; padding-top: calc(12px + env(safe-area-inset-top)); }
   .topbar h1 { font-size: 15.5px; }
   .save-text { display: none; }
 
@@ -3532,8 +3534,8 @@ const STYLES = `
   .gantt-row { grid-template-columns: 108px 1fr; gap: 6px; }
   .gantt-label { font-size: 10.5px; }
 
-  .ai-panel { width: 94vw; height: 78vh; right: 3vw; bottom: 8px; }
-  .ai-fab { bottom: 18px; right: 18px; }
+  .ai-panel { width: 94vw; height: 78vh; right: 3vw; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .ai-fab { bottom: calc(18px + env(safe-area-inset-bottom)); right: 18px; }
 
   .kpi-value { font-size: 21px; }
 }
