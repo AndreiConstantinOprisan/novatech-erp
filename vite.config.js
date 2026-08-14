@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// IMPORTANT: dacă găzduiești pe GitHub Pages la
-// https://<user>.github.io/<repo>/  →  base trebuie să fie "/<repo>/"
-// dacă folosești un domeniu propriu sau <user>.github.io direct → base: "/"
+// Cu domeniu propriu (erp.novatechproiect.ro), aplicația stă la rădăcina
+// subdomeniului, deci base rămâne "/". (Dacă te întorci vreodată la adresa
+// gratuită github.io/novatech-erp/, schimbă înapoi în "/novatech-erp/".)
 export default defineConfig({
   plugins: [react()],
-  base: "/novatech-erp/",
+  base: "/",
 });
