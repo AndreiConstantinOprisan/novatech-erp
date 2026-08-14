@@ -9,10 +9,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, createContext
 const STORAGE_KEY = "novatech-app-data-v1";
 const TODAY = new Date();
 
-/* ---------------------------- Adaptor stocare locală (înlocuiește window.storage din Claude) ---------------------------- */
-// În Claude.ai, window.storage e un API special de artifact. În afara Claude (PWA
-// independentă, instalată pe telefon), folosim localStorage din browser, cu aceeași
-// formă de API (get/set), ca restul aplicației să rămână neschimbată.
+import { supabase, supabaseConfigured } from "./supabaseClient";
+
+/* ---------------------------- Adaptor stocare locală (fallback dacă Supabase nu e configurat încă) ---------------------------- */
 if (typeof window !== "undefined" && !window.storage) {
   window.storage = {
     async get(key) {
@@ -33,6 +32,63 @@ if (typeof window !== "undefined" && !window.storage) {
       return { keys };
     },
   };
+}
+
+/* ---------------------------- Autentificare (activă doar când Supabase e configurat) ---------------------------- */
+
+function useAuth() {
+  const [session, setSession] = useState(undefined); // undefined = se verifică, null = neautentificat, obiect = autentificat
+  const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    if (!supabaseConfigured) { setSession(null); return; }
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => { if (!cancelled) setSession(data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+  }, []);
+
+  const signIn = useCallback(async (email, parola) => {
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password: parola });
+    if (error) setAuthError(error.message === "Invalid login credentials" ? "Email sau parolă greșite." : error.message);
+  }, []);
+
+  const signOut = useCallback(async () => { await supabase.auth.signOut(); }, []);
+
+  return { session, authError, signIn, signOut };
+}
+
+function LoginScreen({ onSignIn, error }) {
+  const [email, setEmail] = useState("");
+  const [parola, setParola] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setLoading(true);
+    await onSignIn(email, parola);
+    setLoading(false);
+  }
+
+  return (
+    <div className="login-screen">
+      <form className="login-card" onSubmit={submit}>
+        <div className="login-brand">
+          <div className="brand-mark">NP</div>
+          <div>
+            <div className="brand-name">NOVATECH</div>
+            <div className="brand-sub">PROIECT SRL</div>
+          </div>
+        </div>
+        <h2>Autentificare</h2>
+        <Field label="Email"><input type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nume@novatech.ro" /></Field>
+        <Field label="Parolă"><input type="password" required value={parola} onChange={(e) => setParola(e.target.value)} placeholder="••••••••" /></Field>
+        {error && <div className="login-error"><IconAlert size={15} /> {error}</div>}
+        <Button type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center" }}>{loading ? "Se conectează…" : "Intră în cont"}</Button>
+      </form>
+    </div>
+  );
 }
 
 /* ---------------------------- Utilitare ---------------------------- */
@@ -419,26 +475,58 @@ function usePersistentData() {
   const [status, setStatus] = useState("loading"); // loading | ready | saving | error
   const skipNextSave = useRef(true);
   const saveTimer = useRef(null);
+  const lastWritten = useRef(null); // evită ecoul propriei scrieri prin realtime
+
+  const ROW_ID = 1;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await window.storage.get(STORAGE_KEY, true);
-        if (cancelled) return;
-        if (res && res.value) {
-          setData(JSON.parse(res.value));
+        if (supabaseConfigured) {
+          let { data: row, error } = await supabase.from("app_state").select("data").eq("id", ROW_ID).single();
+          if (cancelled) return;
+          if (error && error.code === "PGRST116") {
+            // rândul nu există încă — îl creăm cu datele demo inițiale
+            const seed = seedData();
+            await supabase.from("app_state").insert({ id: ROW_ID, data: seed });
+            row = { data: seed };
+          } else if (error) {
+            throw error;
+          }
+          const json = JSON.stringify(row.data);
+          lastWritten.current = json;
+          setData(row.data);
         } else {
-          setData(seedData());
+          const res = await window.storage.get(STORAGE_KEY, true);
+          if (cancelled) return;
+          if (res && res.value) setData(JSON.parse(res.value));
+          else setData(seedData());
         }
         setStatus("ready");
       } catch (e) {
         if (cancelled) return;
         setData(seedData());
-        setStatus("ready");
+        setStatus("error");
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // sincronizare live: când alt dispozitiv salvează, primim update-ul automat
+  useEffect(() => {
+    if (!supabaseConfigured) return;
+    const channel = supabase
+      .channel("app_state_changes")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_state", filter: `id=eq.${ROW_ID}` }, (payload) => {
+        const json = JSON.stringify(payload.new.data);
+        if (json === lastWritten.current) return; // e propria noastră scriere, ignorăm
+        skipNextSave.current = true;
+        lastWritten.current = json;
+        setData(payload.new.data);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
@@ -448,7 +536,14 @@ function usePersistentData() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
-        await window.storage.set(STORAGE_KEY, JSON.stringify(data), true);
+        if (supabaseConfigured) {
+          const json = JSON.stringify(data);
+          lastWritten.current = json;
+          const { error } = await supabase.from("app_state").update({ data, updated_at: new Date().toISOString() }).eq("id", ROW_ID);
+          if (error) throw error;
+        } else {
+          await window.storage.set(STORAGE_KEY, JSON.stringify(data), true);
+        }
         setStatus("ready");
       } catch (e) {
         setStatus("error");
@@ -461,7 +556,14 @@ function usePersistentData() {
   const reset = useCallback(async () => {
     const fresh = seedData();
     setData(fresh);
-    try { await window.storage.set(STORAGE_KEY, JSON.stringify(fresh), true); } catch (e) {}
+    try {
+      if (supabaseConfigured) {
+        lastWritten.current = JSON.stringify(fresh);
+        await supabase.from("app_state").update({ data: fresh, updated_at: new Date().toISOString() }).eq("id", ROW_ID);
+      } else {
+        await window.storage.set(STORAGE_KEY, JSON.stringify(fresh), true);
+      }
+    } catch (e) {}
   }, []);
 
   return { data, status, update, reset };
@@ -3050,7 +3152,7 @@ function AsistentAI({ open, onClose }) {
   );
 }
 
-function Shell() {
+function Shell({ onSignOut, userEmail }) {
   const [tab, setTab] = useState("dashboard");
   const { status, reset } = useData();
   const active = NAV.find((n) => n.key === tab);
@@ -3082,6 +3184,8 @@ function Shell() {
           ))}
         </nav>
         <div className="sidebar-foot">
+          {userEmail && <div className="sidebar-user">{userEmail}</div>}
+          {onSignOut && <button className="link-btn muted" onClick={onSignOut}>Deconectare</button>}
           {!resetConfirm ? (
             <button className="link-btn muted" onClick={() => setResetConfirm(true)}>Resetează datele demo</button>
           ) : (
@@ -3350,6 +3454,18 @@ const STYLES = `
 
 .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: var(--ink-soft); font-size: 13px; }
 
+.login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); padding: 20px; }
+.login-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 32px 28px;
+  width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(15,40,60,0.12);
+}
+.login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.login-brand .brand-name, .login-brand .brand-sub { color: var(--ink); }
+.login-brand .brand-sub { color: var(--ink-soft); }
+.login-card h2 { font-size: 16px; margin: 0 0 16px; color: var(--ink); }
+.login-error { display: flex; align-items: center; gap: 6px; color: var(--danger); font-size: 12.5px; margin: 4px 0 14px; }
+.sidebar-user { font-size: 11.5px; color: rgba(255,255,255,0.55); padding: 0 8px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .gantt-chart { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
 .gantt-row { display: grid; grid-template-columns: 190px 1fr; align-items: center; gap: 10px; }
 .gantt-label { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3424,7 +3540,26 @@ const STYLES = `
 `;
 
 export default function NovatechApp() {
+  const { session, authError, signIn, signOut } = useAuth();
   const store = usePersistentData();
+
+  if (supabaseConfigured && session === undefined) {
+    return (
+      <div className="novatech-root">
+        <style>{STYLES}</style>
+        <div className="loading-screen">Se verifică autentificarea…</div>
+      </div>
+    );
+  }
+
+  if (supabaseConfigured && session === null) {
+    return (
+      <div className="novatech-root">
+        <style>{STYLES}</style>
+        <LoginScreen onSignIn={signIn} error={authError} />
+      </div>
+    );
+  }
 
   if (store.data === null) {
     return (
@@ -3440,7 +3575,7 @@ export default function NovatechApp() {
       <style>{STYLES}</style>
       <DataCtx.Provider value={store}>
         <ToastProvider>
-          <Shell />
+          <Shell onSignOut={supabaseConfigured ? signOut : null} userEmail={session?.user?.email} />
         </ToastProvider>
       </DataCtx.Provider>
     </div>
