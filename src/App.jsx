@@ -499,6 +499,7 @@ const IconEdit = (p) => <Icon {...p} path={<><path d="M12 20h9"/><path d="M16.5 
 const IconTrash = (p) => <Icon {...p} path={<><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></>} />;
 const IconAlert = (p) => <Icon {...p} path={<><path d="M12 3 1 21h22Z"/><path d="M12 9v5M12 17h.01"/></>} />;
 const IconLock = (p) => <Icon {...p} path={<><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><path d="M12 15v2"/></>} />;
+const IconCalendar = (p) => <Icon {...p} path={<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7 14h4M7 17.5h7"/></>} />;
 const IconCheck = (p) => <Icon {...p} path={<><path d="M20 6 9 17l-5-5"/></>} />;
 const IconClock = (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>} />;
 const IconWinMin = (p) => <Icon {...p} path={<><path d="M5 12h14"/></>} />;
@@ -536,9 +537,9 @@ const CHEI_OP = ["clienti", "proiecte", "concedii", "pontaje", "tichete", "garan
 const CHEI_BIROU = ["angajati", "facturi", "furnizori", "miscariPartener", "cheltuieliAdm", "achizitiiPlanificate", "tarifeContracte"];
 const NIVELE_ROL = { admin: [1, 2, 3], birou: [1, 2], tehnician: [1] };
 const NAV_ROL = {
-  admin: ["dashboard", "lucrari", "personal", "clienti", "financiar", "patrimoniu", "cashflow", "calculator", "securitate"],
-  birou: ["dashboard", "lucrari", "clienti", "financiar", "patrimoniu", "calculator", "securitate"],
-  tehnician: ["lucrari", "clienti", "securitate"],
+  admin: ["dashboard", "lucrari", "calendar", "personal", "clienti", "financiar", "patrimoniu", "cashflow", "calculator", "securitate"],
+  birou: ["dashboard", "lucrari", "calendar", "clienti", "financiar", "patrimoniu", "calculator", "securitate"],
+  tehnician: ["lucrari", "calendar", "clienti", "securitate"],
 };
 const nivelCheie = (k) => (CHEI_OP.includes(k) ? 1 : CHEI_BIROU.includes(k) ? 2 : 3);
 const DATE_VIDE = () => ({
@@ -1009,7 +1010,7 @@ function normCategorie(c) {
 
 function emptyProiect() {
   return { id: null, nume: "", clientId: "", categorie: "", stadiu: "Ofertare", procentExecutie: 0, valoareOferta: "", valoareContract: "",
-    costRealizat: "", dataStart: "", dataFinal: "", materialeAchizitionate: "", materialePuseInOpera: "", devize: [] };
+    costRealizat: "", dataStart: "", dataFinal: "", oreEstimate: "", materialeAchizitionate: "", materialePuseInOpera: "", devize: [] };
 }
 
 function ModuleLucrari() {
@@ -1059,6 +1060,7 @@ function ModuleLucrari() {
         valoareContract: p.valoareContract === "" ? null : Number(p.valoareContract),
         costRealizat: Number(p.costRealizat) || 0,
         procentExecutie: Math.max(0, Math.min(100, Number(p.procentExecutie) || 0)),
+        oreEstimate: p.oreEstimate === "" || p.oreEstimate == null ? "" : Math.max(0, Number(p.oreEstimate) || 0),
         materialeAchizitionate: Number(p.materialeAchizitionate) || 0,
         materialePuseInOpera: Number(p.materialePuseInOpera) || 0,
       };
@@ -1534,6 +1536,7 @@ function ProiectForm({ proiect, clienti, onSave, onCancel }) {
       <Field label="Cost realizat (RON)"><input type="number" step="any" value={f.costRealizat} onChange={set("costRealizat")} /></Field>
       <Field label="Data start"><input type="date" value={f.dataStart} onChange={set("dataStart")} /></Field>
       <Field label="Data finalizare"><input type="date" value={f.dataFinal} onChange={set("dataFinal")} /></Field>
+      <Field label="Ore estimate (manual, opțional)" hint="dacă rămâne gol, se calculează din manopera devizelor"><input type="number" step="any" min="0" value={f.oreEstimate ?? ""} onChange={set("oreEstimate")} /></Field>
       <Field label="Materiale achiziționate (RON)" hint="valoare cumulată comandată/recepționată"><input type="number" step="any" value={f.materialeAchizitionate} onChange={set("materialeAchizitionate")} /></Field>
       <Field label="Materiale puse în operă (RON)" hint="valoare cumulată consumată pe șantier"><input type="number" step="any" value={f.materialePuseInOpera} onChange={set("materialePuseInOpera")} /></Field>
       {!f.id && <div className="hint-block field-wide">După salvare, ți se va cere să adaugi imediat un deviz inițial (cel puțin o linie) — orice proiect are nevoie de un deviz minim.</div>}
@@ -1920,8 +1923,8 @@ function CerereForm({ angajati, onSave, onCancel }) {
   );
 }
 
-function PontajForm({ angajati, proiecte, onSave, onCancel }) {
-  const [f, setF] = useState(emptyPontaj());
+function PontajForm({ angajati, proiecte, onSave, onCancel, initial }) {
+  const [f, setF] = useState(initial ? { ...emptyPontaj(), ...initial } : emptyPontaj());
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
     <form className="form-grid" onSubmit={(e) => { e.preventDefault(); if (f.angajatId && f.proiectId && f.data) onSave(f); }}>
@@ -4753,6 +4756,7 @@ function CalculatorSimulator() {
 const NAV = [
   { key: "dashboard", label: "Tablou de bord", Icon: IconDash, View: Dashboard },
   { key: "lucrari", label: "Lucrări", Icon: IconWorks, View: ModuleLucrari },
+  { key: "calendar", label: "Calendar", Icon: IconCalendar, View: ModuleCalendar },
   { key: "personal", label: "Personal", Icon: IconUsers, View: ModulePersonal },
   { key: "clienti", label: "Clienți", Icon: IconClients, View: ModuleClienti },
   { key: "financiar", label: "Financiar", Icon: IconMoney, View: ModuleFinanciar },
@@ -5072,6 +5076,433 @@ function ModuleSecuritate() {
   );
 }
 
+/* =========================================================================
+   MODUL: CALENDAR — harta Gantt a lucrărilor, pontaj pe zile, timp de lucru rămas
+   ========================================================================= */
+
+const LUNI_RO = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
+const ZILE_SC = ["D", "L", "M", "M", "J", "V", "S"];
+const CULORI_CATEGORIE = { "Kaufland": "#B5483D", "Nibe": "#2E7D87", "E.ON": "#A9780F", "Lucrări diverse": "#5B6B7B" };
+const culoareCategorie = (c) => CULORI_CATEGORIE[normCategorie(c)] || "#5B6B7B";
+
+const dStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseD = (s) => new Date(s + "T00:00:00");
+const diffZile = (a, b) => Math.round((parseD(b) - parseD(a)) / 86400000);
+const addZile = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); return dStr(d); };
+const addLuni = (s, n) => { const d = parseD(s.slice(0, 7) + "-01"); d.setMonth(d.getMonth() + n); return dStr(d); };
+const fmtOre = (n) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString("ro-RO");
+
+// Ore estimate pe lucrare: câmpul manual (dacă e completat) sau suma orelor de manoperă din devize
+// (devizul Final dacă există; altfel devizul inițial + cele suplimentare).
+const RE_ORE = /(^|[^a-zăâîșț])(ore|ora|oră|h)([^a-zăâîșț]|$)/i;
+function oreEstimateProiect(p) {
+  const manual = Number(p.oreEstimate) || 0;
+  if (manual > 0) return { ore: manual, sursa: "manual" };
+  const dv = p.devize || [];
+  const ultim = (m) => dv.filter((d) => d.moment === m).sort((a, b) => (a.data || "").localeCompare(b.data || "")).slice(-1)[0];
+  const final = ultim("Final");
+  const set = final ? [final] : [ultim("Inițial (ofertă)"), ...dv.filter((d) => d.moment === "Suplimentar")].filter(Boolean);
+  let ore = 0;
+  set.forEach((d) => (d.linii || []).forEach((l) => { if (l.categorie === "Manoperă" && RE_ORE.test(l.um || "")) ore += Number(l.cantitate) || 0; }));
+  return { ore, sursa: "devize" };
+}
+function orePeProiect(data) {
+  const m = {};
+  (data.pontaje || []).forEach((x) => { m[x.proiectId] = (m[x.proiectId] || 0) + (Number(x.ore) || 0); });
+  return m;
+}
+
+function CalNav({ children }) { return <div className="section-toolbar cal-toolbar">{children}</div>; }
+
+/* ---------- 1. Gantt: distribuția în timp a lucrărilor ---------- */
+function CalGantt({ data }) {
+  const azi = dStr(new Date());
+  const [start, setStart] = useState(addLuni(azi, -1));
+  const [luni, setLuni] = useState(6);
+  const [cat, setCat] = useState("");
+  const [finalizate, setFinalizate] = useState(false);
+  const [deschise, setDeschise] = useState({});
+  const end = addLuni(start, luni);
+  const span = Math.max(1, diffZile(start, end));
+  const pos = (s) => Math.max(0, Math.min(100, (diffZile(start, s) / span) * 100));
+  const ore = useMemo(() => orePeProiect(data), [data.pontaje]);
+  const angajatName = (id) => (data.angajati || []).find((a) => a.id === id)?.nume || "";
+  const clientName = (id) => data.clienti.find((c) => c.id === id)?.nume || "";
+
+  const lista = data.proiecte.filter((p) => (!cat || normCategorie(p.categorie) === cat) && (finalizate || p.stadiu !== "Finalizat"));
+  const faraDate = lista.filter((p) => !p.dataStart || !p.dataFinal);
+  const programate = lista.filter((p) => p.dataStart && p.dataFinal);
+  const vizibile = programate.filter((p) => p.dataFinal >= start && p.dataStart < end).sort((a, b) => a.dataStart.localeCompare(b.dataStart));
+  const inAfara = programate.length - vizibile.length;
+  const luniHeader = Array.from({ length: luni }, (_, i) => {
+    const m = addLuni(start, i);
+    return { m, left: pos(m), width: (diffZile(m, addLuni(start, i + 1)) / span) * 100 };
+  });
+  const grupe = CATEGORII_PROIECT.map((c) => ({ cat: c, lista: vizibile.filter((p) => normCategorie(p.categorie) === c) })).filter((g) => g.lista.length);
+
+  function bara(dataStart, dataFinal) {
+    const l = pos(dataStart);
+    const r = pos(addZile(dataFinal, 1));
+    return { left: l + "%", width: Math.max(0.8, r - l) + "%", taiatStanga: dataStart < start, taiatDreapta: dataFinal >= end };
+  }
+
+  return (
+    <div className="stack-md">
+      <CalNav>
+        <div className="btn-row" style={{ flexWrap: "wrap" }}>
+          <Button size="sm" variant="ghost" onClick={() => setStart(addLuni(start, -1))}>‹ Luna anterioară</Button>
+          <Button size="sm" variant="ghost" onClick={() => setStart(addLuni(azi, -1))}>Azi</Button>
+          <Button size="sm" variant="ghost" onClick={() => setStart(addLuni(start, 1))}>Luna următoare ›</Button>
+          <select value={luni} onChange={(e) => setLuni(Number(e.target.value))} aria-label="Perioadă afișată">
+            <option value={3}>3 luni</option><option value={6}>6 luni</option><option value={12}>12 luni</option>
+          </select>
+          <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categorie">
+            <option value="">Toate categoriile</option>
+            {CATEGORII_PROIECT.map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <label className="cal-check"><input type="checkbox" checked={finalizate} onChange={(e) => setFinalizate(e.target.checked)} /> Arată și lucrările finalizate</label>
+        </div>
+        <div className="muted" style={{ fontSize: 12 }}>{LUNI_RO[parseD(start).getMonth()]} {parseD(start).getFullYear()} – {LUNI_RO[parseD(addLuni(end, -1)).getMonth()]} {parseD(addLuni(end, -1)).getFullYear()}</div>
+      </CalNav>
+
+      {vizibile.length === 0 ? (
+        <EmptyState text="Nicio lucrare programată în perioada afișată. Schimbă perioada sau completează datele de start și finalizare în modulul Lucrări." />
+      ) : (
+        <Card>
+          <div className="cal-scroll">
+            <div className="cal-grid">
+              <div className="cal-row cal-head">
+                <div className="cal-label" />
+                <div className="cal-track cal-months">
+                  {luniHeader.map((m) => (
+                    <div key={m.m} className="cal-month" style={{ left: m.left + "%", width: m.width + "%" }}>{LUNI_RO[parseD(m.m).getMonth()].slice(0, luni > 6 ? 3 : 20)}{parseD(m.m).getMonth() === 0 || m.m === start ? " " + parseD(m.m).getFullYear() : ""}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="cal-body">
+                <div className="cal-overlay">
+                  {luniHeader.map((m) => <div key={m.m} className="cal-vline" style={{ left: m.left + "%" }} />)}
+                  {azi >= start && azi < end && <div className="cal-today" style={{ left: pos(azi) + "%" }}><span>azi</span></div>}
+                </div>
+                {grupe.map((g) => (
+                  <div key={g.cat}>
+                    <div className="cal-group"><span className="cal-dot" style={{ background: culoareCategorie(g.cat) }} /> {g.cat} <span className="muted">({g.lista.length})</span></div>
+                    {g.lista.map((p) => {
+                      const b = bara(p.dataStart, p.dataFinal);
+                      const est = oreEstimateProiect(p);
+                      const pont = ore[p.id] || 0;
+                      const intarziat = p.stadiu !== "Finalizat" && p.dataFinal < azi;
+                      const culoare = culoareCategorie(p.categorie);
+                      const acts = (p.activitatiGantt || []).filter((a) => a.dataStart && a.dataFinal);
+                      const open = !!deschise[p.id];
+                      return (
+                        <div key={p.id}>
+                          <div className="cal-row">
+                            <div className="cal-label">
+                              {acts.length > 0
+                                ? <button className="cal-chev" onClick={() => setDeschise({ ...deschise, [p.id]: !open })} title="Arată activitățile">{open ? "▾" : "▸"}</button>
+                                : <span className="cal-chev-sp" />}
+                              <div style={{ minWidth: 0 }}>
+                                <div className="cell-title cal-ellipsis">{p.nume}</div>
+                                <div className="cell-sub cal-ellipsis">{clientName(p.clientId)} · {fmtOre(pont)}{est.ore > 0 ? " / " + fmtOre(est.ore) : ""} h</div>
+                              </div>
+                            </div>
+                            <div className="cal-track">
+                              <div className={`cal-bar ${intarziat ? "late" : ""}`} style={{ left: b.left, width: b.width, background: culoare + "33", borderColor: intarziat ? "#B3261E" : culoare, borderLeftStyle: b.taiatStanga ? "dashed" : "solid", borderRightStyle: b.taiatDreapta ? "dashed" : "solid" }}
+                                title={`${p.nume}\n${fmtDate(p.dataStart)} – ${fmtDate(p.dataFinal)}\nExecuție: ${Number(p.procentExecutie) || 0}%\nOre pontate: ${fmtOre(pont)}${est.ore > 0 ? " din " + fmtOre(est.ore) : ""}${intarziat ? "\nÎNTÂRZIAT" : ""}`}>
+                                <div className="cal-bar-fill" style={{ width: (Number(p.procentExecutie) || 0) + "%", background: culoare }} />
+                                <span className="cal-bar-label">{Number(p.procentExecutie) || 0}%{intarziat ? " · întârziat" : ""}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {open && acts.map((a) => {
+                            if (a.dataFinal < start || a.dataStart >= end) return null;
+                            const ba = bara(a.dataStart, a.dataFinal);
+                            return (
+                              <div className="cal-row cal-sub" key={a.id}>
+                                <div className="cal-label"><span className="cal-chev-sp" /><div className="cell-sub cal-ellipsis">↳ {a.denumire}{a.angajatId ? " · " + angajatName(a.angajatId) : ""}</div></div>
+                                <div className="cal-track">
+                                  <div className="cal-bar thin" style={{ left: ba.left, width: ba.width, background: culoare + "22", borderColor: culoare }} title={`${a.denumire}\n${fmtDate(a.dataStart)} – ${fmtDate(a.dataFinal)}\n${a.procent || 0}%`}>
+                                    <div className="cal-bar-fill" style={{ width: (Number(a.procent) || 0) + "%", background: culoare, opacity: 0.6 }} />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Bara colorată plină = procentul de execuție. Linia verticală marchează ziua de azi; marginile punctate înseamnă că lucrarea continuă dincolo de perioada afișată. Apasă ▸ pentru a vedea activitățile unei lucrări.</div>
+        </Card>
+      )}
+      {inAfara > 0 && <div className="hint-block">{inAfara} {inAfara === 1 ? "lucrare programată este" : "lucrări programate sunt"} în afara perioadei afișate.</div>}
+      {faraDate.length > 0 && (
+        <Card title={`Fără date programate (${faraDate.length})`}>
+          <div className="hint-block" style={{ marginBottom: 8 }}>Aceste lucrări nu apar în grafic fiindcă nu au completate data de start și data de finalizare. Le completezi din modulul Lucrări (Editează).</div>
+          <div className="cal-chips">{faraDate.map((p) => <span key={p.id} className="badge tone-neutral">{p.nume}</span>)}</div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 2. Pontaj pe zile ---------- */
+function CalPontaj({ data }) {
+  const { update } = useData();
+  const toast = useToast();
+  const azi = dStr(new Date());
+  const [luna, setLuna] = useState(azi.slice(0, 7));
+  const [modal, setModal] = useState(null); // { angajatId, data }
+  const an = Number(luna.slice(0, 4)), lunaNr = Number(luna.slice(5, 7));
+  const nrZile = new Date(an, lunaNr, 0).getDate();
+  const sarb = useMemo(() => romanianHolidays(an), [an]);
+  const zile = Array.from({ length: nrZile }, (_, i) => {
+    const iso = `${luna}-${String(i + 1).padStart(2, "0")}`;
+    const dow = parseD(iso).getDay();
+    return { n: i + 1, iso, dow, off: dow === 0 || dow === 6 || sarb.has(iso) };
+  });
+  const pontaje = (data.pontaje || []).filter((x) => (x.data || "").slice(0, 7) === luna);
+  const pontMap = {};
+  pontaje.forEach((x) => {
+    const k = x.angajatId + "|" + x.data;
+    (pontMap[k] = pontMap[k] || []).push(x);
+  });
+  const proiectName = (id) => data.proiecte.find((p) => p.id === id)?.nume || "—";
+  const angajati = data.angajati.filter((a) => a.activ !== false || pontaje.some((x) => x.angajatId === a.id));
+  const concediiDe = (angId, iso) => (data.concedii || []).find((c) => c.angajatId === angId && c.status !== "Respins" && c.dataStart <= iso && iso <= c.dataFinal);
+
+  const totaluriZi = zile.map((z) => pontaje.filter((x) => x.data === z.iso).reduce((s, x) => s + (Number(x.ore) || 0), 0));
+  const orePeLucrare = {};
+  pontaje.forEach((x) => { orePeLucrare[x.proiectId] = (orePeLucrare[x.proiectId] || 0) + (Number(x.ore) || 0); });
+
+  function addPontaj(p) {
+    update((d) => { d.pontaje = d.pontaje || []; d.pontaje.push({ id: uid(), angajatId: p.angajatId, proiectId: p.proiectId, data: p.data, ore: Number(p.ore) || 0 }); return d; });
+    toast("Pontaj înregistrat.");
+    setModal(null);
+  }
+  function stergePontaj(id) {
+    update((d) => { d.pontaje = (d.pontaje || []).filter((x) => x.id !== id); return d; });
+    toast("Pontaj șters.", "warn");
+  }
+
+  const modalItems = modal ? (data.pontaje || []).filter((x) => x.angajatId === modal.angajatId && x.data === modal.data) : [];
+
+  return (
+    <div className="stack-md">
+      <CalNav>
+        <div className="btn-row" style={{ flexWrap: "wrap" }}>
+          <Button size="sm" variant="ghost" onClick={() => setLuna(addLuni(luna + "-01", -1).slice(0, 7))}>‹</Button>
+          <strong style={{ minWidth: 150, textAlign: "center" }}>{LUNI_RO[lunaNr - 1]} {an}</strong>
+          <Button size="sm" variant="ghost" onClick={() => setLuna(addLuni(luna + "-01", 1).slice(0, 7))}>›</Button>
+          <Button size="sm" variant="ghost" onClick={() => setLuna(azi.slice(0, 7))}>Luna curentă</Button>
+        </div>
+        <div className="cal-legend">
+          <span><i className="cal-sw cal-ok" /> 8 h sau mai mult</span>
+          <span><i className="cal-sw cal-low" /> sub 8 h</span>
+          <span><i className="cal-sw cal-co" /> CO</span>
+          <span><i className="cal-sw cal-cm" /> CM</span>
+          <span><i className="cal-sw cal-pend" /> cerere în așteptare</span>
+          <span><i className="cal-sw cal-off" /> weekend / sărbătoare</span>
+        </div>
+      </CalNav>
+
+      {angajati.length === 0 ? <EmptyState text="Niciun angajat în evidență." /> : (
+        <Card>
+          <div className="cal-scroll">
+            <table className="cal-pontaj">
+              <thead>
+                <tr>
+                  <th className="cal-stick">Angajat</th>
+                  <th className="cal-tot">Total</th>
+                  <th className="cal-tot">Nepont.</th>
+                  {zile.map((z) => <th key={z.iso} className={`cal-day ${z.off ? "cal-off" : ""} ${z.iso === azi ? "cal-azi" : ""}`}><div>{z.n}</div><div className="cal-dow">{ZILE_SC[z.dow]}</div></th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {angajati.map((a) => {
+                  let total = 0, nepontate = 0;
+                  const celule = zile.map((z) => {
+                    const items = pontMap[a.id + "|" + z.iso] || [];
+                    const ore = items.reduce((s, x) => s + (Number(x.ore) || 0), 0);
+                    total += ore;
+                    const c = concediiDe(a.id, z.iso);
+                    let cls = z.off ? "cal-off" : "", txt = "";
+                    if (ore > 0) { txt = fmtOre(ore); cls = ore >= 8 ? "cal-ok" : "cal-low"; }
+                    else if (c) { txt = c.tip === "Medical" ? "CM" : "CO"; cls = c.status === "Cerere" ? "cal-pend" : c.tip === "Medical" ? "cal-cm" : "cal-co"; }
+                    else if (!z.off && z.iso <= azi) nepontate++;
+                    const titlu = items.length ? items.map((x) => `${proiectName(x.proiectId)}: ${fmtOre(x.ore)} h`).join("\n") : c ? `${c.tip === "Medical" ? "Concediu medical" : "Concediu de odihnă"}${c.status === "Cerere" ? " (cerere în așteptare)" : ""}` : "";
+                    return <td key={z.iso} className={`cal-cell ${cls}`} title={titlu} onClick={() => setModal({ angajatId: a.id, data: z.iso })}>{txt}</td>;
+                  });
+                  return (
+                    <tr key={a.id}>
+                      <td className="cal-stick"><div className="cell-title cal-ellipsis">{a.nume}</div></td>
+                      <td className="cal-tot mono">{fmtOre(total)}</td>
+                      <td className="cal-tot">{nepontate > 0 ? <Badge tone="warn">{nepontate}</Badge> : <span className="muted">0</span>}</td>
+                      {celule}
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="cal-stick"><b>Total ore / zi</b></td>
+                  <td className="cal-tot mono"><b>{fmtOre(totaluriZi.reduce((s, x) => s + x, 0))}</b></td>
+                  <td />
+                  {totaluriZi.map((t, i) => <td key={i} className={`cal-cell cal-foot ${zile[i].off ? "cal-off" : ""}`}>{t > 0 ? fmtOre(t) : ""}</td>)}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Apasă pe o celulă ca să adaugi sau să ștergi ore pentru acea zi. „Nepontate” = zile lucrătoare până azi fără ore și fără concediu.</div>
+        </Card>
+      )}
+
+      <Card title={`Ore pe lucrare — ${LUNI_RO[lunaNr - 1]} ${an}`}>
+        {Object.keys(orePeLucrare).length === 0 ? <EmptyState text="Niciun pontaj în luna aleasă." /> : (
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead><tr><th>Lucrare</th><th className="num">Ore în lună</th></tr></thead>
+              <tbody>
+                {Object.entries(orePeLucrare).sort((a, b) => b[1] - a[1]).map(([id, h]) => <tr key={id}><td>{proiectName(id)}</td><td className="num mono">{fmtOre(h)}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Modal open={!!modal} onClose={() => setModal(null)} title={modal ? `Pontaj — ${data.angajati.find((a) => a.id === modal.angajatId)?.nume || ""} · ${fmtDate(modal.data)}` : ""}>
+        {modal && (
+          <div className="stack-md">
+            {modalItems.length > 0 && (
+              <div className="stack-md">
+                {modalItems.map((x) => (
+                  <div key={x.id} className="btn-row" style={{ justifyContent: "space-between" }}>
+                    <span>{proiectName(x.proiectId)} — <b className="mono">{fmtOre(x.ore)} h</b></span>
+                    <button className="link-btn danger" onClick={() => stergePontaj(x.id)}>Șterge</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <PontajForm key={modal.angajatId + modal.data} angajati={data.angajati} proiecte={data.proiecte} initial={{ angajatId: modal.angajatId, data: modal.data }} onSave={addPontaj} onCancel={() => setModal(null)} />
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+/* ---------- 3. Timp de lucru rămas pe lucrare ---------- */
+function CalTimp({ data }) {
+  const azi = dStr(new Date());
+  const [cat, setCat] = useState("");
+  const [finalizate, setFinalizate] = useState(false);
+  const ore = useMemo(() => orePeProiect(data), [data.pontaje]);
+  const clientName = (id) => data.clienti.find((c) => c.id === id)?.nume || "";
+
+  const randuri = data.proiecte
+    .filter((p) => (!cat || normCategorie(p.categorie) === cat) && (finalizate || p.stadiu !== "Finalizat"))
+    .map((p) => {
+      const est = oreEstimateProiect(p);
+      const pont = ore[p.id] || 0;
+      const exec = Number(p.procentExecutie) || 0;
+      const ramase = est.ore > 0 ? est.ore - pont : null;
+      const consum = est.ore > 0 ? (pont / est.ore) * 100 : null;
+      const zileRamase = p.dataFinal && p.dataFinal >= azi ? calcZileLucratoare(p.dataStart && p.dataStart > azi ? p.dataStart : azi, p.dataFinal) : 0;
+      const oreZi = ramase !== null && ramase > 0 && zileRamase > 0 ? ramase / zileRamase : null;
+      let stare;
+      if (p.stadiu === "Finalizat") stare = { tone: "neutral", label: "Finalizat", ord: 5 };
+      else if (est.ore <= 0) stare = { tone: "neutral", label: "Fără estimare ore", ord: 4 };
+      else if (pont > est.ore) stare = { tone: "danger", label: "Ore depășite", ord: 0 };
+      else if (p.dataFinal && p.dataFinal < azi) stare = { tone: "danger", label: "Întârziat", ord: 1 };
+      else if (consum > exec + 15) stare = { tone: "warn", label: "Consum peste ritm", ord: 2 };
+      else stare = { tone: "ok", label: "În grafic", ord: 3 };
+      return { p, est, pont, exec, ramase, consum, zileRamase, oreZi, stare };
+    })
+    .sort((a, b) => a.stare.ord - b.stare.ord || (a.p.dataFinal || "9999").localeCompare(b.p.dataFinal || "9999"));
+
+  const activ = randuri.filter((r) => r.p.stadiu !== "Finalizat");
+  const totEst = activ.reduce((s, r) => s + r.est.ore, 0);
+  const totPont = activ.reduce((s, r) => s + r.pont, 0);
+  const totRamase = activ.reduce((s, r) => s + (r.ramase !== null && r.ramase > 0 ? r.ramase : 0), 0);
+  const probleme = randuri.filter((r) => r.stare.tone === "danger" || r.stare.tone === "warn").length;
+
+  return (
+    <div className="stack-md">
+      <div className="grid-4">
+        <Card><div className="kpi-label">Ore estimate (lucrări active)</div><div className="kpi-value mono">{fmtOre(totEst)}</div><div className="kpi-sub">din devize sau introduse manual</div></Card>
+        <Card><div className="kpi-label">Ore pontate</div><div className="kpi-value mono">{fmtOre(totPont)}</div><div className="kpi-sub">pe lucrările active</div></Card>
+        <Card><div className="kpi-label">Ore rămase</div><div className="kpi-value mono">{fmtOre(totRamase)}</div><div className="kpi-sub">estimate minus pontate</div></Card>
+        <Card><div className="kpi-label">Lucrări de urmărit</div><div className={`kpi-value ${probleme ? "text-danger" : ""}`}>{probleme}</div><div className="kpi-sub">ore depășite, întârziate sau peste ritm</div></Card>
+      </div>
+      <CalNav>
+        <div className="btn-row" style={{ flexWrap: "wrap" }}>
+          <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categorie">
+            <option value="">Toate categoriile</option>
+            {CATEGORII_PROIECT.map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <label className="cal-check"><input type="checkbox" checked={finalizate} onChange={(e) => setFinalizate(e.target.checked)} /> Arată și lucrările finalizate</label>
+        </div>
+      </CalNav>
+      {randuri.length === 0 ? <EmptyState text="Nicio lucrare de afișat." /> : (
+        <Card>
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr><th>Lucrare</th><th>Perioadă</th><th className="num">Ore estimate</th><th className="num">Ore pontate</th><th className="num">Ore rămase</th><th>Consum ore vs. execuție</th><th className="num">Ore/zi necesare</th><th>Stare</th></tr>
+              </thead>
+              <tbody>
+                {randuri.map((r) => (
+                  <tr key={r.p.id}>
+                    <td><div className="cell-title">{r.p.nume}</div><div className="cell-sub">{clientName(r.p.clientId)} · {normCategorie(r.p.categorie)}</div></td>
+                    <td>{r.p.dataStart || r.p.dataFinal ? <><div>{fmtDate(r.p.dataStart)} – {fmtDate(r.p.dataFinal)}</div><div className="cell-sub">{r.zileRamase > 0 ? `${r.zileRamase} zile lucrătoare rămase` : r.p.dataFinal && r.p.dataFinal < azi && r.p.stadiu !== "Finalizat" ? `termen depășit cu ${diffZile(r.p.dataFinal, azi)} zile` : ""}</div></> : <span className="muted">—</span>}</td>
+                    <td className="num mono">{r.est.ore > 0 ? fmtOre(r.est.ore) : "—"}{r.est.ore > 0 && <div className="cell-sub">{r.est.sursa === "manual" ? "manual" : "din devize"}</div>}</td>
+                    <td className="num mono">{fmtOre(r.pont)}</td>
+                    <td className={`num mono ${r.ramase !== null && r.ramase < 0 ? "text-danger" : ""}`}>{r.ramase === null ? "—" : fmtOre(r.ramase)}</td>
+                    <td style={{ minWidth: 150 }}>
+                      {r.consum === null ? <span className="muted">—</span> : (
+                        <div className="cal-mini">
+                          <div className="cal-mini-row"><span>ore</span><div className="cal-mini-track"><div style={{ width: Math.min(100, r.consum) + "%", background: r.consum > 100 ? "#B3261E" : "#C77D12" }} /></div><span className="mono">{Math.round(r.consum)}%</span></div>
+                          <div className="cal-mini-row"><span>exec.</span><div className="cal-mini-track"><div style={{ width: r.exec + "%", background: "#2E6F9E" }} /></div><span className="mono">{Math.round(r.exec)}%</span></div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="num mono">{r.oreZi !== null ? fmtOre(r.oreZi) : "—"}</td>
+                    <td><Badge tone={r.stare.tone}>{r.stare.label}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="hint-block" style={{ marginTop: 10 }}>Orele estimate se iau din liniile de manoperă (în ore) ale devizelor: devizul final, dacă există, altfel cel inițial plus cele suplimentare. Pentru o lucrare le poți introduce și manual, în modulul Lucrări → Editează → „Ore estimate (manual)”. „Consum peste ritm” înseamnă că s-a consumat din ore cu mai mult de 15 puncte procentuale peste progresul de execuție.</div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function ModuleCalendar() {
+  const { rol } = useData();
+  const areAngajati = rol === "admin" || rol === "birou";
+  const taburi = [{ key: "gantt", label: "Lucrări (Gantt)" }, ...(areAngajati ? [{ key: "pontaj", label: "Pontaj pe zile" }] : []), { key: "timp", label: "Timp rămas" }];
+  const [tab, setTab] = useState("gantt");
+  const { data } = useData();
+  return (
+    <div className="stack-lg">
+      <div className="tab-row">
+        {taburi.map((t) => <button key={t.key} type="button" className={`tab-btn ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)}>{t.label}</button>)}
+      </div>
+      {tab === "gantt" && <CalGantt data={data} />}
+      {tab === "pontaj" && areAngajati && <CalPontaj data={data} />}
+      {tab === "timp" && <CalTimp data={data} />}
+    </div>
+  );
+}
+
 function Shell({ onSignOut, userEmail }) {
   const [tab, setTab] = useState("dashboard");
   const { status, reset, rol } = useData();
@@ -5387,6 +5818,63 @@ const STYLES = `
 .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; color: var(--ink-soft); font-size: 13px; }
 
 .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); padding: 20px; }
+
+/* ---- Calendar ---- */
+.cal-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
+.cal-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }
+.cal-scroll { overflow-x: auto; }
+.cal-grid { min-width: 860px; }
+.cal-row { display: grid; grid-template-columns: 230px 1fr; align-items: center; min-height: 40px; }
+.cal-row.cal-sub { min-height: 28px; }
+.cal-head { min-height: 26px; border-bottom: 1px solid var(--line); }
+.cal-label { position: sticky; left: 0; z-index: 3; background: var(--surface); display: flex; align-items: center; gap: 4px; padding: 4px 8px 4px 0; min-width: 0; }
+.cal-track { position: relative; height: 30px; }
+.cal-months { height: 24px; }
+.cal-month { position: absolute; top: 4px; font-size: 11px; font-weight: 600; color: var(--ink-soft); padding-left: 4px; white-space: nowrap; overflow: hidden; }
+.cal-body { position: relative; }
+.cal-overlay { position: absolute; top: 0; bottom: 0; left: 230px; right: 0; pointer-events: none; z-index: 1; }
+.cal-vline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.cal-today { position: absolute; top: 0; bottom: 0; width: 2px; background: #B3261E; opacity: 0.75; }
+.cal-today span { position: absolute; top: 0; left: 4px; font-size: 9px; font-weight: 700; color: #B3261E; }
+.cal-group { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); padding: 10px 0 4px; position: sticky; left: 0; }
+.cal-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.cal-bar { position: absolute; top: 3px; height: 24px; border: 1px solid; border-radius: 4px; overflow: hidden; z-index: 2; box-sizing: border-box; display: flex; align-items: center; }
+.cal-bar.thin { top: 8px; height: 12px; }
+.cal-bar.late { box-shadow: 0 0 0 1px #B3261E; }
+.cal-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; opacity: 0.85; }
+.cal-bar-label { position: relative; z-index: 1; font-size: 10.5px; font-weight: 700; color: var(--ink); padding-left: 6px; white-space: nowrap; text-shadow: 0 0 3px #fff, 0 0 3px #fff; }
+.cal-chev { background: none; border: none; cursor: pointer; width: 16px; padding: 0; color: var(--ink-soft); flex: none; }
+.cal-chev-sp { display: inline-block; width: 16px; flex: none; }
+.cal-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: var(--ink-soft); }
+.cal-sw { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--line); vertical-align: -2px; margin-right: 4px; }
+.cal-pontaj { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 100%; }
+.cal-pontaj th, .cal-pontaj td { border-bottom: 1px solid var(--line); border-right: 1px solid #EEF1F4; padding: 0; text-align: center; }
+.cal-pontaj .cal-stick { position: sticky; left: 0; z-index: 2; background: var(--surface); text-align: left; padding: 6px 10px; min-width: 150px; max-width: 170px; }
+.cal-pontaj .cal-day { min-width: 28px; font-weight: 600; padding: 3px 0; }
+.cal-dow { font-size: 9px; color: var(--ink-soft); font-weight: 500; }
+.cal-pontaj .cal-cell { min-width: 28px; height: 30px; cursor: pointer; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+.cal-pontaj .cal-cell:hover { outline: 2px solid var(--blueprint-2); outline-offset: -2px; }
+.cal-pontaj .cal-foot { cursor: default; font-weight: 600; }
+.cal-pontaj .cal-tot { min-width: 54px; padding: 6px 8px; text-align: right; background: #F7F9FB; }
+.cal-ok { background: #CDE9D6; }
+.cal-low { background: #FBE7B5; }
+.cal-co { background: #CFE3F5; }
+.cal-cm { background: #F3D1D1; }
+.cal-pend { background: repeating-linear-gradient(45deg, #DCE9F6, #DCE9F6 4px, #FFFFFF 4px, #FFFFFF 8px); }
+.cal-off { background: #EEF1F4; }
+.cal-pontaj .cal-azi { box-shadow: inset 0 -2px 0 #B3261E; }
+.cal-mini { display: flex; flex-direction: column; gap: 4px; }
+.cal-mini-row { display: flex; align-items: center; gap: 6px; font-size: 10.5px; }
+.cal-mini-row > span:first-child { width: 30px; color: var(--ink-soft); }
+.cal-mini-track { flex: 1; height: 6px; background: #E3E8ED; border-radius: 3px; overflow: hidden; }
+.cal-mini-track > div { height: 100%; }
+@media (max-width: 700px) {
+  .cal-row { grid-template-columns: 140px 1fr; }
+  .cal-overlay { left: 140px; }
+}
+
 .login-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 32px 28px;
   width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(15,40,60,0.12);
